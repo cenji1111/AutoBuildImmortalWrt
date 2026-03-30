@@ -49,9 +49,6 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 PACKAGES=""
 PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
-PACKAGES="$PACKAGES luci-theme-argon"
-PACKAGES="$PACKAGES luci-app-argon-config"
-PACKAGES="$PACKAGES luci-i18n-argon-config-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-diskman-zh-cn"
 #24.10.0
 PACKAGES="$PACKAGES luci-i18n-package-manager-zh-cn"
@@ -60,7 +57,7 @@ PACKAGES="$PACKAGES openssh-sftp-server"
 # 文件管理器
 PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
 PACKAGES="$PACKAGES luci-app-openclash"
-PACKAGES="$PACKAGES xray-core sing-box"
+PACKAGES="$PACKAGES  sing-box"
 
 
 # 第三方软件包 合并
