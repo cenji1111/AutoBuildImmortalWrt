@@ -51,7 +51,6 @@ PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
 
 # --- 2. HomeProxy 核心与可视化（重点！） ---
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
-PACKAGES="$PACKAGES luci-ui-metacubexd luci-ui-yacd"  
 
 # --- 3. 必须的底层驱动（Tun 模式） ---
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
