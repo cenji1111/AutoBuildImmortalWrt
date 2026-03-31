@@ -12,7 +12,7 @@ sh shell/prepare-packages.sh
 # 添加架构优先级
 sed -i '1i\arch aarch64_generic 10\narch aarch64_cortex-a53 15' repositories.conf
 
-# --- 🛠️ 核心预制件注入 (纯净上网版) ---
+# --- 🛠️ 核心预制件注入  ---
 FILES_DIR="/home/build/immortalwrt/files"
 mkdir -p ${FILES_DIR}/etc/uci-defaults
 mkdir -p ${FILES_DIR}/www/metacubexd
@@ -35,14 +35,13 @@ exit 0
 EOF
 chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 
-# 2. 预下载猫咪面板 (修正版 wget，不带拨号配置)
+# 2. 预下载猫咪面板 (修正版 wget，)
 echo "🔄 正在下载猫咪面板..."
 UI_URL="https://github.com/MetaCubeX/MetaCubeXD/releases/latest/download/compressed-dist.tgz"
 # 使用标准参数，适配所有环境
 wget -O /tmp/ui.tgz "$UI_URL" && tar -zxf /tmp/ui.tgz -C ${FILES_DIR}/www/metacubexd
 
-# --- 🚀 软件包列表 (移除拨号相关，保持轻量) ---
-# 移除了 pppoe 相关组件，只保留核心网络和代理
+# ---  软件包列表  ---
 PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy ca-bundle curl"
