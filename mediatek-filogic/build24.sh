@@ -52,6 +52,8 @@ PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
 #24.10.0
 PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn"
 PACKAGES="$PACKAGES openssh-sftp-server"
+PACKAGES="$PACKAGES luci-app-homeproxy"
+PACKAGES="$PACKAGES luci-i18n-homeproxy-zh-cn"
 PACKAGES="$PACKAGES sing-box"
 
 
