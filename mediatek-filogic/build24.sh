@@ -48,17 +48,20 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 # 定义所需安装的包列表
 PACKAGES=""
 
-# --- 核心：卸载基础版，安装增强版  ---
-PACKAGES="$PACKAGES -dnsmasq dnsmasq-full"
+PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
+PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
 
-# --- 基础工具与界面 ---
-PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
-PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn openssh-sftp-server"
 
-# --- HomeProxy 全家桶 (解锁 URLTest 和 中文界面) ---
+# --- 3. HomeProxy 核心  ---
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
-PACKAGES="$PACKAGES luci-app-homeproxy-sub-converter"
+
+# --- 4. 必须的底层驱动  ---
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
+
+# --- 5. 增强组件  ---
+PACKAGES="$PACKAGES ca-bundle libustream-openssl coreutils-base64"
+
+
 
 # 第三方软件包 合并
 # ======== shell/custom-packages.sh =======
