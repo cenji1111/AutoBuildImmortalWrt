@@ -17,19 +17,28 @@ FILES_DIR="/home/build/immortalwrt/files"
 mkdir -p ${FILES_DIR}/etc/uci-defaults
 mkdir -p ${FILES_DIR}/www/metacubexd
 
-# 1. ⚡ 强制开启 9090 端口（官方 UCI 方式）
+# 1. ⚡ 强制开启 9090 端口 + 创建最小默认实例（让 homeproxy 一开机就启动）
 cat << 'EOF' > ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 #!/bin/sh
+# 强制开启 Clash API
 uci set homeproxy.config.clash_api_port='9090'
 uci set homeproxy.config.clash_api_secret='123456'
+
+# 创建一个最小的默认 instance（sing-box），防止 "active with no instances"
+uci set homeproxy.@instance[0]=instance
+uci set homeproxy.@instance[0].name='default'
+uci set homeproxy.@instance[0].type='sing-box'
+uci set homeproxy.@instance[0].enabled='1'
+
 uci commit homeproxy
 /etc/init.d/homeproxy restart >/dev/null 2>&1 || true
-echo "HomeProxy Clash API 已强制开启 9090 端口（secret: 123456）" > /tmp/homeproxy-api.log
+
+echo "HomeProxy API 9090 + default instance 已设置" > /tmp/homeproxy-api.log
 exit 0
 EOF
 chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 
-# 2. 🔄 预下载猫咪面板（**最新最稳健版**）
+# 2. 🔄 预下载猫咪面板（已验证最新版结构正确）
 echo "🔄 正在下载猫咪面板 (MetaCubeXD)..."
 UI_URL="https://github.com/MetaCubeX/MetaCubeXD/releases/latest/download/compressed-dist.tgz"
 
@@ -38,7 +47,6 @@ if ! wget -q --no-check-certificate -O /tmp/ui.tgz "$UI_URL"; then
     exit 1
 fi
 
-# 关键修复：先解压到临时目录，再复制展平（解决子目录问题）
 mkdir -p /tmp/metacubexd_temp
 if ! tar -zxf /tmp/ui.tgz -C /tmp/metacubexd_temp; then
     echo "❌ 解压失败！"
@@ -46,7 +54,6 @@ if ! tar -zxf /tmp/ui.tgz -C /tmp/metacubexd_temp; then
     exit 1
 fi
 
-# 展平复制（自动处理可能存在的顶层目录）
 cp -r /tmp/metacubexd_temp/* ${FILES_DIR}/www/metacubexd/ 2>/dev/null || true
 rm -rf /tmp/metacubexd_temp /tmp/ui.tgz
 
@@ -69,15 +76,16 @@ fi
 echo "✅ 编译成功！"
 
 # =============================================
-# === GitHub Actions 自动检查（务必看这段）===
+# === 阶段1 检查（请务必看这段输出）===
 # =============================================
 echo "========================================"
-echo "=== 阶段1 检查（猫咪面板是否正常）==="
+echo "=== 阶段1 检查（猫咪面板 + uci 脚本）==="
 echo "========================================"
-echo "猫咪面板文件数量（正常应 ≥ 80）："
+echo "猫咪面板顶层文件数量（新版正常是 14）："
 ls -l ${FILES_DIR}/www/metacubexd/ | wc -l
 echo "前 15 个文件："
 ls -l ${FILES_DIR}/www/metacubexd/ | head -n 15
-echo "uci-defaults 脚本："
+echo "uci-defaults 脚本内容（必须是纯英文）："
 cat ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 echo "========================================"
+echo "✅ 编译完成！请刷机后按下面步骤测试"
