@@ -12,57 +12,47 @@ sh shell/prepare-packages.sh
 # 添加架构优先级
 sed -i '1i\arch aarch64_generic 10\narch aarch64_cortex-a53 15' repositories.conf
 
-# --- 🛠️ 核心预制件注入  ---
+# --- 🛠️ 核心预制件注入 (纯净上网版) ---
 FILES_DIR="/home/build/immortalwrt/files"
 mkdir -p ${FILES_DIR}/etc/uci-defaults
 mkdir -p ${FILES_DIR}/www/metacubexd
 
-# 1. ⚡ 核心逻辑：强制开启 9090 端口
-# 我们创建一个初始化脚本，它会直接修改 HomeProxy 生成配置的脚本文件
+# 1. ⚡ 基因手术：强制开启 9090 端口 (uci-defaults 模式)
 cat << 'EOF' > ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 #!/bin/sh
-# 找到 HomeProxy 生成 sing-box 配置的脚本
-TARGET_FILE="/usr/share/homeproxy/sing-box.sh"
-if [ -f "$TARGET_FILE" ]; then
-    # 强制在 experimental 块中插入 clash_api 配置
-    sed -i '/"experimental": {/a \        "clash_api": { "external_controller": "0.0.0.0:9090", "secret": "123456" },' "$TARGET_FILE"
+# 强制开启控制端口配置
+uci set homeproxy.config.clash_api_port='9090'
+uci set homeproxy.config.clash_api_secret='123456'
+uci commit homeproxy
+
+# 修改 HomeProxy 生成逻辑，确保 experimental 块包含 API 接口
+TARGET="/usr/share/homeproxy/sing-box.sh"
+if [ -f "$TARGET" ]; then
+    # 强制在 experimental 块注入控制台配置
+    sed -i '/"experimental": {/a \        "clash_api": { "external_controller": "0.0.0.0:9090", "secret": "123456" },' "$TARGET"
 fi
 exit 0
 EOF
 chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 
-# 2. 预下载猫咪面板 (增加重试和解压优化)
-echo "🔄 正在预下载猫咪面板..."
+# 2. 预下载猫咪面板 (修正版 wget，不带拨号配置)
+echo "🔄 正在下载猫咪面板..."
 UI_URL="https://github.com/MetaCubeX/MetaCubeXD/releases/latest/download/compressed-dist.tgz"
-wget -q -t 3 -O /tmp/ui.tgz $UI_URL && tar -zxf /tmp/ui.tgz -C ${FILES_DIR}/www/metacubexd
+# 使用标准参数，适配所有环境
+wget -O /tmp/ui.tgz "$UI_URL" && tar -zxf /tmp/ui.tgz -C ${FILES_DIR}/www/metacubexd
 
-# 3. 准备其他系统配置
-mkdir -p ${FILES_DIR}/etc/config
-cat << EOF > ${FILES_DIR}/etc/config/pppoe-settings
-enable_pppoe=${ENABLE_PPPOE}
-pppoe_account=${PPPOE_ACCOUNT}
-pppoe_password=${PPPOE_PASSWORD}
-EOF
-
-# ---  定义软件包列表 (保持轻量) ---
+# --- 🚀 软件包列表 (移除拨号相关，保持轻量) ---
+# 移除了 pppoe 相关组件，只保留核心网络和代理
 PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
-PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
-PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
-PACKAGES="$PACKAGES ca-bundle libustream-openssl coreutils-base64 curl"
+PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy ca-bundle curl"
 
-# 处理不同机型的逻辑
-if [ "$PROFILE" = "glinet_gl-axt1800" ] || [ "$PROFILE" = "glinet_gl-ax1800" ]; then
-    PACKAGES="$PACKAGES -luci-i18n-diskman-zh-cn"
-else
-    PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
-fi
-
-# AX6S 建议关掉 Docker，内存吃不消
-if [ "$INCLUDE_DOCKER" = "yes" ]; then
-    PACKAGES="$PACKAGES luci-i18n-dockerman-zh-cn"
-fi
-
-# 构建镜像
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image..."
+# 针对 AX6S 的机型构建
+echo "$(date '+%Y-%m-%d %H:%M:%S') - 正在为 AX6S 生成镜像..."
 make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="$FILES_DIR"
+
+if [ $? -ne 0 ]; then
+    echo "❌ 编译失败，请检查网络或脚本逻辑。"
+    exit 1
+fi
+echo "✅ 编译成功！固件已生成。"
