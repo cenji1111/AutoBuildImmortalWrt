@@ -45,21 +45,19 @@ cat /home/build/immortalwrt/files/etc/config/pppoe-settings
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 
 
-# 定义所需安装的包列表
-PACKAGES=""
-
+# --- 1. 基础系统与中文界面 ---
 PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
 PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
 
-
-# --- 3. HomeProxy 核心  ---
+# --- 2. HomeProxy 核心与可视化（重点！） ---
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
+PACKAGES="$PACKAGES luci-ui-metacubexd luci-ui-yacd"  
 
-# --- 4. 必须的底层驱动  ---
+# --- 3. 必须的底层驱动（Tun 模式） ---
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
 
-# --- 5. 增强组件  ---
-PACKAGES="$PACKAGES ca-bundle libustream-openssl coreutils-base64"
+# --- 4. 增强组件与证书 ---
+PACKAGES="$PACKAGES ca-bundle libustream-openssl coreutils-base64 curl"
 
 
 
