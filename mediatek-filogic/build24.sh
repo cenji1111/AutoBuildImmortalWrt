@@ -45,17 +45,20 @@ cat /home/build/immortalwrt/files/etc/config/pppoe-settings
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 
 
-# 定义所需安装的包列表 下列插件你都可以自行删减
+# 定义所需安装的包列表
 PACKAGES=""
 PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
-#24.10.0
+# 24.10.0
 PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn"
 PACKAGES="$PACKAGES openssh-sftp-server"
+
+# --- HomeProxy 主程序、中文包、执行核心 ---
 PACKAGES="$PACKAGES luci-app-homeproxy"
 PACKAGES="$PACKAGES luci-i18n-homeproxy-zh-cn"
 PACKAGES="$PACKAGES sing-box"
-
+PACKAGES="$PACKAGES luci-app-homeproxy-sub-converter"
+PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
 
 # 第三方软件包 合并
 # ======== shell/custom-packages.sh =======
