@@ -47,16 +47,16 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 
 # 定义所需安装的包列表
 PACKAGES=""
-PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn"
-PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
-# 24.10.0
-PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn"
-PACKAGES="$PACKAGES openssh-sftp-server"
 
-# --- HomeProxy 主程序、中文包、执行核心 ---
-PACKAGES="$PACKAGES luci-app-homeproxy"
-PACKAGES="$PACKAGES luci-i18n-homeproxy-zh-cn"
-PACKAGES="$PACKAGES sing-box"
+# --- 核心：卸载基础版，安装增强版  ---
+PACKAGES="$PACKAGES -dnsmasq dnsmasq-full"
+
+# --- 基础工具与界面 ---
+PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
+PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn openssh-sftp-server"
+
+# --- HomeProxy 全家桶 (解锁 URLTest 和 中文界面) ---
+PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
 PACKAGES="$PACKAGES luci-app-homeproxy-sub-converter"
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
 
