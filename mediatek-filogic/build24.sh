@@ -1,76 +1,95 @@
 #!/bin/bash
 source shell/custom-packages.sh
 source shell/switch_repository.sh
+# 该文件实际为imagebuilder容器内的build.sh
 
-# 🔄 同步第三方仓库
-echo "🔄 正在同步第三方软件仓库..."
+#echo "✅ 你选择了第三方软件包：$CUSTOM_PACKAGES"
+# 下载 run 文件仓库
+echo "🔄 正在同步第三方软件仓库 Cloning run file repo..."
 git clone --depth=1 https://github.com/wukongdaily/store.git /tmp/store-run-repo
+
+# 拷贝 run/arm64 下所有 run 文件和ipk文件 到 extra-packages 目录
 mkdir -p /home/build/immortalwrt/extra-packages
 cp -r /tmp/store-run-repo/run/arm64/* /home/build/immortalwrt/extra-packages/
+
+echo "✅ Run files copied to extra-packages:"
+ls -lh /home/build/immortalwrt/extra-packages/*.run
+# 解压并拷贝ipk到packages目录
 sh shell/prepare-packages.sh
+ls -lah /home/build/immortalwrt/packages/
+# 添加架构优先级信息
+sed -i '1i\
+arch aarch64_generic 10\n\
+arch aarch64_cortex-a53 15' repositories.conf
 
-# 添加架构优先级
-sed -i '1i\arch aarch64_generic 10\narch aarch64_cortex-a53 15' repositories.conf
+# yml 传入的路由器型号 PROFILE
+echo "Building for profile: $PROFILE"
 
-# pppoe 设置
+echo "Include Docker: $INCLUDE_DOCKER"
 echo "Create pppoe-settings"
 mkdir -p /home/build/immortalwrt/files/etc/config
+
+# 创建pppoe配置文件 yml传入pppoe变量————>pppoe-settings文件
 cat << EOF > /home/build/immortalwrt/files/etc/config/pppoe-settings
 enable_pppoe=${ENABLE_PPPOE}
 pppoe_account=${PPPOE_ACCOUNT}
 pppoe_password=${PPPOE_PASSWORD}
 EOF
 
-# HomeProxy 核心配置（开箱即用）
-FILES_DIR="/home/build/immortalwrt/files"
-mkdir -p ${FILES_DIR}/etc/uci-defaults
+echo "cat pppoe-settings"
+cat /home/build/immortalwrt/files/etc/config/pppoe-settings
 
-cat << 'EOF' > ${FILES_DIR}/etc/uci-defaults/99-homeproxy-fix
-#!/bin/sh
-uci set homeproxy.config.proxy_mode='redirect'
-uci set homeproxy.config.clash_api_port='9090'
-uci set homeproxy.config.clash_api_secret='123456'
+# 输出调试信息
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting build process..."
 
-# 创建默认 instance
-uci -q delete homeproxy.@instance[0]
-uci add homeproxy instance
-uci set homeproxy.@instance[-1].name='default'
-uci set homeproxy.@instance[-1].type='sing-box'
-uci set homeproxy.@instance[-1].enabled='1'
-
-uci commit homeproxy
-
-# 清理 TUN 残留
-ip link delete singtun0 2>/dev/null || true
-ip link delete tun0 2>/dev/null || true
-
-echo "HomeProxy 配置完成（redirect + 9090 API）" > /tmp/homeproxy.log
-exit 0
-EOF
-
-chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-fix
-
-# --- 软件包列表（精简无重复） ---
-PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
-PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
+PACKAGES=""
+# --- 基础工具与界面 ---
+PACKAGES="$PACKAGES curl luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
+PACKAGES="$PACKAGES luci-i18n-ttyd-zh-cn openssh-sftp-server"
+# --- 核心：卸载基础版，安装增强版  ---
+PACKAGES="$PACKAGES -dnsmasq dnsmasq-full"
+# --- HomeProxy 全家桶 (解锁 URLTest 和 中文界面) ---
 PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
+PACKAGES="$PACKAGES luci-app-homeproxy-sub-converter"
 PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
-PACKAGES="$PACKAGES ca-bundle curl"
 
-# 合并自定义包
-if [ -n "$CUSTOM_PACKAGES" ]; then
+# 第三方软件包 合并
+# ======== shell/custom-packages.sh =======
+if [ "$PROFILE" = "glinet_gl-axt1800" ] || [ "$PROFILE" = "glinet_gl-ax1800" ]; then
+    # 这2款 暂时不支持第三方插件的集成 snapshot版本太高 opkg换成apk包管理器 6.12内核 
+    echo "Model:$PROFILE not support third-parted packages"
+    PACKAGES="$PACKAGES -luci-i18n-diskman-zh-cn"
+else
+    echo "Other Model:$PROFILE"
     PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
 fi
 
-# Docker 支持（如果需要）
+# 判断是否需要编译 Docker 插件
 if [ "$INCLUDE_DOCKER" = "yes" ]; then
     PACKAGES="$PACKAGES luci-i18n-dockerman-zh-cn"
+    echo "Adding package: luci-i18n-dockerman-zh-cn"
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - 正在为 $PROFILE 生成镜像..."
-echo "Packages: $PACKAGES"
+# 若构建openclash 则添加内核
+if echo "$PACKAGES" | grep -q "luci-app-openclash"; then
+    echo "✅ 已选择 luci-app-openclash，添加 openclash core"
+    mkdir -p files/etc/openclash/core
+    # Download clash_meta
+    META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-arm64.tar.gz"
+    wget -qO- $META_URL | tar xOvz > files/etc/openclash/core/clash_meta
+    chmod +x files/etc/openclash/core/clash_meta
+    # Download GeoIP and GeoSite
+    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat -O files/etc/openclash/GeoIP.dat
+    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat -O files/etc/openclash/GeoSite.dat
+else
+    echo "⚪️ 未选择 luci-app-openclash"
+fi
 
-make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="$FILES_DIR"
+# 构建镜像
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
+echo "$PACKAGES"
+
+make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="/home/build/immortalwrt/files"
 
 if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: Build failed!"
