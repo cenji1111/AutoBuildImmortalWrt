@@ -12,20 +12,22 @@ sh shell/prepare-packages.sh
 # 添加架构优先级
 sed -i '1i\arch aarch64_generic 10\narch aarch64_cortex-a53 15' repositories.conf
 
-# --- 🛠️ 核心预制件注入（最终版） ---
+# pppoe 设置
+echo "Create pppoe-settings"
+mkdir -p /home/build/immortalwrt/files/etc/config
+cat << EOF > /home/build/immortalwrt/files/etc/config/pppoe-settings
+enable_pppoe=${ENABLE_PPPOE}
+pppoe_account=${PPPOE_ACCOUNT}
+pppoe_password=${PPPOE_PASSWORD}
+EOF
+
+# HomeProxy 核心配置（开箱即用）
 FILES_DIR="/home/build/immortalwrt/files"
 mkdir -p ${FILES_DIR}/etc/uci-defaults
-mkdir -p ${FILES_DIR}/www/metacubexd
 
-# 1. 最终加强版 uci-defaults
-cat << 'EOF' > ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
+cat << 'EOF' > ${FILES_DIR}/etc/uci-defaults/99-homeproxy-fix
 #!/bin/sh
-echo "=== HomeProxy API 强制设置开始 ==="
-
-# 强制 redirect 模式
 uci set homeproxy.config.proxy_mode='redirect'
-
-# 强制 Clash API
 uci set homeproxy.config.clash_api_port='9090'
 uci set homeproxy.config.clash_api_secret='123456'
 
@@ -38,53 +40,41 @@ uci set homeproxy.@instance[-1].enabled='1'
 
 uci commit homeproxy
 
-# 清理 TUN
+# 清理 TUN 残留
 ip link delete singtun0 2>/dev/null || true
 ip link delete tun0 2>/dev/null || true
 
-# 重启服务
-/etc/init.d/homeproxy restart
-sleep 5
-
-echo "HomeProxy 9090 + default instance 已设置" > /tmp/homeproxy-api.log
-echo "设置完成！"
+echo "HomeProxy 配置完成（redirect + 9090 API）" > /tmp/homeproxy.log
 exit 0
 EOF
-chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-api-fix
 
-# 2. 猫咪面板下载
-echo "🔄 正在下载猫咪面板..."
-UI_URL="https://github.com/MetaCubeX/MetaCubeXD/releases/latest/download/compressed-dist.tgz"
+chmod +x ${FILES_DIR}/etc/uci-defaults/99-homeproxy-fix
 
-if ! wget -q --no-check-certificate -O /tmp/ui.tgz "$UI_URL"; then
-    echo "❌ 下载失败"
-    exit 1
+# --- 软件包列表（精简无重复） ---
+PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
+PACKAGES="$PACKAGES luci luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn"
+PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
+PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy"
+PACKAGES="$PACKAGES ca-bundle curl"
+
+# 合并自定义包
+if [ -n "$CUSTOM_PACKAGES" ]; then
+    PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
 fi
 
-mkdir -p /tmp/metacubexd_temp
-tar -zxf /tmp/ui.tgz -C /tmp/metacubexd_temp
-cp -r /tmp/metacubexd_temp/* ${FILES_DIR}/www/metacubexd/ 2>/dev/null || true
-rm -rf /tmp/metacubexd_temp /tmp/ui.tgz
+# Docker 支持（如果需要）
+if [ "$INCLUDE_DOCKER" = "yes" ]; then
+    PACKAGES="$PACKAGES luci-i18n-dockerman-zh-cn"
+fi
 
-echo "✅ 猫咪面板已放入固件"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - 正在为 $PROFILE 生成镜像..."
+echo "Packages: $PACKAGES"
 
-# --- 软件包列表 ---
-PACKAGES="$PACKAGES -dnsmasq -dnsmasq-dhcpv6 dnsmasq-full"
-PACKAGES="$PACKAGES luci-app-homeproxy luci-i18n-homeproxy-zh-cn sing-box"
-PACKAGES="$PACKAGES kmod-tun ip-full ipset iptables-mod-tproxy kmod-ipt-tproxy ca-bundle curl"
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') - 正在为 AX6S 生成镜像..."
 make image PROFILE=$PROFILE PACKAGES="$PACKAGES" FILES="$FILES_DIR"
 
 if [ $? -ne 0 ]; then
-    echo "❌ 编译失败"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: Build failed!"
     exit 1
 fi
 
-echo "✅ 编译成功！"
-
-# 检查输出
-echo "========================================"
-echo "猫咪面板文件数量： $(ls ${FILES_DIR}/www/metacubexd/ | wc -l)"
-echo "uci-defaults 脚本已生成"
-echo "========================================"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Build completed successfully."
